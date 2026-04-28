@@ -1,4 +1,4 @@
-🎨 Normal Map Studio
+# 🎨 Normal Map Studio
 Normal Map Studio is an advanced, fully client-side web tool that transforms any 2D texture into a professional-grade Normal Map. It provides a fast and efficient solution for game developers, 3D artists, and designers directly in the browser.
 ✨ Key Features
 * 🚀 Instant Processing: Preview all changes in real-time as soon as an image is uploaded.
