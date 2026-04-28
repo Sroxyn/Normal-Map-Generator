@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Normal Map Studio | Advanced Texture Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --sidebar-bg: #1e293b;
+            --accent-color: #3b82f6;
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 10px;
+        }
+
+        .canvas-container {
+            position: relative;
+            background-image: radial-gradient(#334155 1px, transparent 1px);
+            background-size: 20px 20px;
+            cursor: grab;
+        }
+
+        .canvas-container:active {
+            cursor: grabbing;
+        }
+
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 4px;
+            background: #334155;
+            border-radius: 5px;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: var(--accent-color);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 22px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider-toggle {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #334155;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider-toggle:before {
+            position: absolute;
+            content: "";
+            height: 16px; width: 16px;
+            left: 3px; bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider-toggle {
+            background-color: var(--accent-color);
+        }
+
+        input:checked + .slider-toggle:before {
+            transform: translateX(22px);
+        }
+
+        .preview-label {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(15, 23, 42, 0.8);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            color: white;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .drop-zone {
+            border: 2px dashed #475569;
+            transition: all 0.3s ease;
+        }
+
+        .drop-zone.active {
+            border-color: var(--accent-color);
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .loading-spinner {
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            border-top: 3px solid var(--accent-color);
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="flex">
+
+    <!-- Sidebar Kontrolleri -->
+    <aside class="w-80 h-full glass-panel z-20 flex flex-col shadow-2xl">
+        <div class="p-6 border-b border-slate-700">
+            <h1 class="text-xl font-bold flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-500"><path d="m16.24 7.76-1.41 1.41"/><path d="M11.2 16.2c-.3-.3-.7-.3-1 0l-3 3c-.3.3-.3.7 0 1l1 1c.3.3.7.3 1 0l3-3c.3-.3.3-.7 0-1z"/><path d="M15.4 15.4c-.3-.3-.7-.3-1 0l-7 7c-.3.3-.3.7 0 1"/><path d="M17.3 7.7c.3.3.7.3 1 0l3-3c.3-.3.3-.7 0-1l-1-1c-.3-.3-.7-.3-1 0l-3 3c-.3.3-.3.7 0 1z"/><path d="m21 21-1.41-1.41"/><path d="M3 3 10.76 10.76"/></svg>
+                Normal Studio
+            </h1>
+            <p class="text-xs text-slate-400 mt-1 uppercase tracking-wider font-semibold">Doku İşleyici</p>
+        </div>
+
+        <div class="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8">
+            
+            <!-- Dosya Yükleme -->
+            <section>
+                <label class="block text-sm font-medium mb-3">Girdi Dokusu</label>
+                <div id="drop-zone" class="drop-zone rounded-xl p-4 text-center cursor-pointer">
+                    <input type="file" id="file-input" class="hidden" accept="image/*">
+                    <p class="text-xs text-slate-400">Tıklayın veya Sürükleyin</p>
+                    <p class="text-[10px] text-slate-500 mt-1">PNG, JPG, WEBP (4K'ya kadar)</p>
+                </div>
+            </section>
+
+            <!-- Temel Kontroller -->
+            <section class="space-y-4">
+                <div class="flex justify-between items-center">
+                    <label class="text-sm font-medium">Güç (Strength)</label>
+                    <span id="strength-val" class="text-xs text-blue-400">2.0</span>
+                </div>
+                <input type="range" id="strength" min="0.1" max="10.0" step="0.1" value="2.0">
+
+                <div class="flex justify-between items-center pt-2">
+                    <label class="text-sm font-medium">Format</label>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] text-slate-400">OpenGL</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="directx">
+                            <span class="slider-toggle"></span>
+                        </label>
+                        <span class="text-[10px] text-slate-400">DirectX</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Detay İşleme -->
+            <section class="space-y-4 pt-4 border-t border-slate-800">
+                <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest">Detay Ayarları</h3>
+                
+                <div class="flex justify-between items-center">
+                    <label class="text-sm font-medium">Bulanıklık (Blur)</label>
+                    <span id="blur-val" class="text-xs text-blue-400">0px</span>
+                </div>
+                <input type="range" id="blur" min="0" max="10" step="1" value="0">
+
+                <div class="flex justify-between items-center">
+                    <label class="text-sm font-medium">Keskinlik</label>
+                    <span id="sharpness-val" class="text-xs text-blue-400">0</span>
+                </div>
+                <input type="range" id="sharpness" min="0" max="5" step="0.5" value="0">
+
+                <div class="flex justify-between items-center pt-2">
+                    <label class="text-sm font-medium">Yüksek Detay Modu</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="high-detail">
+                        <span class="slider-toggle"></span>
+                    </label>
+                </div>
+            </section>
+
+            <!-- İşleme Göstergesi -->
+            <div id="processing-indicator" class="hidden flex items-center justify-center py-4">
+                <div class="loading-spinner"></div>
+                <span class="ml-2 text-xs text-slate-400">Hesaplanıyor...</span>
+            </div>
+        </div>
+
+        <div class="p-6 border-t border-slate-700 flex flex-col gap-3">
+            <button id="download-btn" class="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold text-sm transition-colors flex items-center justify-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                Normal Map'i Dışa Aktar
+            </button>
+            <p class="text-[10px] text-slate-500 text-center">Yüksek kaliteli PNG olarak kaydedilir</p>
+        </div>
+    </aside>
+
+    <!-- Ana Çalışma Alanı -->
+    <main class="flex-1 relative overflow-hidden bg-[#0a0f1c] flex flex-col">
+        
+        <!-- Araç Çubuğu -->
+        <header class="h-12 border-b border-slate-800 px-6 flex items-center justify-between glass-panel">
+            <div class="flex gap-6 text-xs font-medium text-slate-400">
+                <div class="flex items-center gap-2">
+                    <span id="img-dim">Görsel Yok</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span>Mod:</span>
+                    <span id="mode-indicator" class="text-blue-400">Tam Ekran Önizleme</span>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <button id="reset-zoom" class="text-[10px] hover:text-white text-slate-500 uppercase tracking-widest font-bold">Görünümü Sıfırla</button>
+            </div>
+        </header>
+
+        <!-- Viewport -->
+        <div id="viewport" class="flex-1 canvas-container bg-slate-900 overflow-hidden flex items-center justify-center">
+            <!-- Normal Map Çıktısı -->
+            <div class="preview-label">Normal Map Çıktısı</div>
+            <div id="canvas-wrapper-normal" class="transform origin-center">
+                <canvas id="output-canvas" class="shadow-2xl"></canvas>
+            </div>
+        </div>
+
+        <!-- Alt Bilgi -->
+        <footer class="h-8 border-t border-slate-800 px-4 flex items-center justify-between text-[10px] text-slate-500 bg-[#0f172a]">
+            <div>Normal Map Studio v1.1 • farenin sol tuşuyla sürükle, tekerlekle yakınlaş</div>
+            <div id="status-text">Hazır</div>
+        </footer>
+    </main>
+
+    <script>
+        /**
+         * NORMAL MAP STUDIO - Core Logic
+         */
+        
+        // --- State Management ---
+        const state = {
+            originalImage: null,
+            imageWidth: 0,
+            imageHeight: 0,
+            zoom: 0.8,
+            panX: 0,
+            panY: 0,
+            isDragging: false,
+            lastMouseX: 0,
+            lastMouseY: 0,
+            
+            // Settings
+            strength: 2.0,
+            isDirectX: false,
+            blurRadius: 0,
+            sharpness: 0,
+            highDetail: false,
+            
+            isProcessing: false,
+            debounceTimer: null
+        };
+
+        // --- DOM Elements ---
+        const els = {
+            fileInput: document.getElementById('file-input'),
+            dropZone: document.getElementById('drop-zone'),
+            strengthSlider: document.getElementById('strength'),
+            strengthVal: document.getElementById('strength-val'),
+            blurSlider: document.getElementById('blur'),
+            blurVal: document.getElementById('blur-val'),
+            sharpSlider: document.getElementById('sharpness'),
+            sharpVal: document.getElementById('sharpness-val'),
+            directXToggle: document.getElementById('directx'),
+            highDetailToggle: document.getElementById('high-detail'),
+            downloadBtn: document.getElementById('download-btn'),
+            
+            outputCanvas: document.getElementById('output-canvas'),
+            
+            viewport: document.getElementById('viewport'),
+            wrapperNormal: document.getElementById('canvas-wrapper-normal'),
+            
+            imgDim: document.getElementById('img-dim'),
+            status: document.getElementById('status-text'),
+            processingIndicator: document.getElementById('processing-indicator')
+        };
+
+        // --- Initialization ---
+        function init() {
+            attachEventListeners();
+            resetViewport();
+            updateUIState();
+        }
+
+        function attachEventListeners() {
+            // Uploads
+            els.dropZone.addEventListener('click', () => els.fileInput.click());
+            els.fileInput.addEventListener('change', handleFileUpload);
+            els.dropZone.addEventListener('dragover', (e) => { e.preventDefault(); els.dropZone.classList.add('active'); });
+            els.dropZone.addEventListener('dragleave', () => els.dropZone.classList.remove('active'));
+            els.dropZone.addEventListener('drop', handleDrop);
+
+            // Controls
+            els.strengthSlider.addEventListener('input', (e) => {
+                state.strength = parseFloat(e.target.value);
+                els.strengthVal.textContent = state.strength.toFixed(1);
+                scheduleUpdate();
+            });
+
+            els.blurSlider.addEventListener('input', (e) => {
+                state.blurRadius = parseInt(e.target.value);
+                els.blurVal.textContent = state.blurRadius + 'px';
+                scheduleUpdate();
+            });
+
+            els.sharpSlider.addEventListener('input', (e) => {
+                state.sharpness = parseFloat(e.target.value);
+                els.sharpVal.textContent = state.sharpness;
+                scheduleUpdate();
+            });
+
+            els.directXToggle.addEventListener('change', (e) => {
+                state.isDirectX = e.target.checked;
+                scheduleUpdate();
+            });
+
+            els.highDetailToggle.addEventListener('change', (e) => {
+                state.highDetail = e.target.checked;
+                scheduleUpdate();
+            });
+
+            // Gezinme (Pan/Zoom) - Doğrudan viewport üzerinde
+            els.viewport.addEventListener('mousedown', startPan);
+            window.addEventListener('mousemove', handlePan);
+            window.addEventListener('mouseup', endPan);
+            els.viewport.addEventListener('wheel', handleZoom, { passive: false });
+            document.getElementById('reset-zoom').addEventListener('click', resetViewport);
+
+            // Export
+            els.downloadBtn.addEventListener('click', exportImage);
+        }
+
+        // --- Handlers ---
+        function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if (file) loadImage(file);
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            els.dropZone.classList.remove('active');
+            const file = e.dataTransfer.files[0];
+            if (file) loadImage(file);
+        }
+
+        function loadImage(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    state.originalImage = img;
+                    state.imageWidth = img.width;
+                    state.imageHeight = img.height;
+                    
+                    els.imgDim.textContent = `${img.width} × ${img.height}`;
+                    
+                    resizeCanvases();
+                    processTextures();
+                    resetViewport();
+                    updateUIState();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function resizeCanvases() {
+            if (!state.originalImage) return;
+            els.outputCanvas.width = state.imageWidth;
+            els.outputCanvas.height = state.imageHeight;
+        }
+
+        function scheduleUpdate() {
+            if (!state.originalImage) return;
+            
+            els.processingIndicator.classList.remove('hidden');
+            els.status.textContent = 'Güncelleniyor...';
+            
+            clearTimeout(state.debounceTimer);
+            state.debounceTimer = setTimeout(() => {
+                processTextures();
+            }, 60); 
+        }
+
+        // --- Core Image Processing ---
+        
+        async function processTextures() {
+            if (!state.originalImage || state.isProcessing) return;
+            state.isProcessing = true;
+
+            const startTime = performance.now();
+            
+            // 1. Get Height Map
+            const heightData = generateHeightMap();
+            
+            // 2. Apply Filters
+            const filteredData = applyDetailFilters(heightData);
+            
+            // 3. Generate Normal Map
+            const normalData = generateNormalMap(filteredData);
+            
+            // 4. Update UI
+            const nCtx = els.outputCanvas.getContext('2d');
+            const nImgData = new ImageData(normalData, state.imageWidth, state.imageHeight);
+            nCtx.putImageData(nImgData, 0, 0);
+
+            state.isProcessing = false;
+            els.processingIndicator.classList.add('hidden');
+            els.status.textContent = `İşlendi: ${(performance.now() - startTime).toFixed(0)}ms`;
+        }
+
+        function generateHeightMap() {
+            const canvas = document.createElement('canvas');
+            canvas.width = state.imageWidth;
+            canvas.height = state.imageHeight;
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            ctx.drawImage(state.originalImage, 0, 0);
+            
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+            const heightMap = new Float32Array(state.imageWidth * state.imageHeight);
+
+            for (let i = 0; i < data.length; i += 4) {
+                const lum = (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) / 255;
+                heightMap[i / 4] = lum;
+            }
+            return heightMap;
+        }
+
+        function applyDetailFilters(heightMap) {
+            let processed = new Float32Array(heightMap);
+            const w = state.imageWidth;
+            const h = state.imageHeight;
+
+            if (state.blurRadius > 0) {
+                processed = boxBlur(processed, w, h, state.blurRadius);
+            }
+
+            if (state.sharpness > 0 || state.highDetail) {
+                const amount = state.highDetail ? state.sharpness + 1.5 : state.sharpness;
+                processed = sharpen(processed, w, h, amount);
+            }
+
+            return processed;
+        }
+
+        function generateNormalMap(heightMap) {
+            const w = state.imageWidth;
+            const h = state.imageHeight;
+            const normalMap = new Uint8ClampedArray(w * h * 4);
+            const strength = state.strength * 5.0; 
+            
+            const invG = state.isDirectX ? -1 : 1;
+
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    const idx = y * w + x;
+                    
+                    const l = heightMap[y * w + Math.max(0, x - 1)];
+                    const r = heightMap[y * w + Math.min(w - 1, x + 1)];
+                    const u = heightMap[Math.max(0, y - 1) * w + x];
+                    const d = heightMap[Math.min(h - 1, y + 1) * w + x];
+
+                    let dx = (l - r) * strength;
+                    let dy = (u - d) * strength * invG;
+                    let dz = 1.0;
+
+                    const mag = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                    dx /= mag; dy /= mag; dz /= mag;
+
+                    const target = idx * 4;
+                    normalMap[target] = (dx * 0.5 + 0.5) * 255;
+                    normalMap[target + 1] = (dy * 0.5 + 0.5) * 255;
+                    normalMap[target + 2] = (dz * 0.5 + 0.5) * 255;
+                    normalMap[target + 3] = 255;
+                }
+            }
+            return normalMap;
+        }
+
+        function boxBlur(data, w, h, r) {
+            const output = new Float32Array(data.length);
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    let val = 0, count = 0;
+                    for (let ky = -r; ky <= r; ky++) {
+                        for (let kx = -r; kx <= r; kx++) {
+                            const ny = Math.min(h - 1, Math.max(0, y + ky));
+                            const nx = Math.min(w - 1, Math.max(0, x + kx));
+                            val += data[ny * w + nx];
+                            count++;
+                        }
+                    }
+                    output[y * w + x] = val / count;
+                }
+            }
+            return output;
+        }
+
+        function sharpen(data, w, h, amount) {
+            const output = new Float32Array(data.length);
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    const idx = y * w + x;
+                    const u = data[Math.max(0, y - 1) * w + x];
+                    const d = data[Math.min(h - 1, y + 1) * w + x];
+                    const l = data[y * w + Math.max(0, x - 1)];
+                    const r = data[y * w + Math.min(w - 1, x + 1)];
+                    const laplacian = (u + d + l + r) - 4 * data[idx];
+                    output[idx] = data[idx] - amount * laplacian;
+                }
+            }
+            return output;
+        }
+
+        // --- Gezinme (Pan/Zoom) ---
+        function resetViewport() {
+            if (!state.originalImage) return;
+            const padding = 60;
+            const availableW = els.viewport.clientWidth - padding;
+            const availableH = els.viewport.clientHeight - padding;
+            const scaleX = availableW / state.imageWidth;
+            const scaleY = availableH / state.imageHeight;
+            state.zoom = Math.min(scaleX, scaleY, 1.0);
+            state.panX = 0;
+            state.panY = 0;
+            updateTransforms();
+        }
+
+        function startPan(e) {
+            // Artık tuval üzerine tıklansa da pan yapılabilecek
+            state.isDragging = true;
+            state.lastMouseX = e.clientX;
+            state.lastMouseY = e.clientY;
+        }
+
+        function handlePan(e) {
+            if (!state.isDragging) return;
+            const dx = e.clientX - state.lastMouseX;
+            const dy = e.clientY - state.lastMouseY;
+            state.panX += dx;
+            state.panY += dy;
+            state.lastMouseX = e.clientX;
+            state.lastMouseY = e.clientY;
+            updateTransforms();
+        }
+
+        function endPan() {
+            state.isDragging = false;
+        }
+
+        function handleZoom(e) {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? 0.9 : 1.1;
+            state.zoom = Math.min(Math.max(state.zoom * delta, 0.05), 10);
+            updateTransforms();
+        }
+
+        function updateTransforms() {
+            const transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
+            els.wrapperNormal.style.transform = transform;
+        }
+
+        function updateUIState() {
+            const isReady = state.originalImage !== null;
+            els.downloadBtn.disabled = !isReady;
+            if (!isReady) {
+                els.downloadBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                els.downloadBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        function exportImage() {
+            if (!state.originalImage) return;
+            const link = document.createElement('a');
+            link.download = `normal_map_${Date.now()}.png`;
+            link.href = els.outputCanvas.toDataURL('image/png', 1.0);
+            link.click();
+            els.status.textContent = 'Normal map başarıyla kaydedildi.';
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
